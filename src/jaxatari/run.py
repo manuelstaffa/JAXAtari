@@ -82,6 +82,48 @@ def _resolve_reward_function(spec: str | None) -> Callable | None:
     )
 
 
+def _reward_value(reward) -> float:
+    if hasattr(reward, "item"):
+        return float(reward.item())
+    return float(reward)
+
+
+def _print_reward_update(previous_reward: float | None, count: int) -> None:
+    if previous_reward is None or count <= 0:
+        return
+    print(f"reward={previous_reward} [{count} time(s)]")
+
+
+def _update_reward_print_state(
+    reward_value: float,
+    mode: str,
+    previous_reward: float | None,
+    count: int,
+) -> tuple[float | None, int]:
+    if mode == "all":
+        print(f"reward={reward_value}")
+        return previous_reward, count
+
+    if mode != "update":
+        return previous_reward, count
+
+    if previous_reward is None:
+        return reward_value, 1
+
+    if reward_value == previous_reward:
+        return previous_reward, count + 1
+
+    _print_reward_update(previous_reward, count)
+    return reward_value, 1
+
+
+def _flush_reward_print_state(
+    mode: str, previous_reward: float | None, count: int
+) -> None:
+    if mode == "update":
+        _print_reward_update(previous_reward, count)
+
+
 class RewardOverrideWrapper(JaxatariWrapper):
     """Replace the base environment reward with a custom callable."""
 
@@ -145,8 +187,12 @@ def main() -> None:
     parser.add_argument(
         "-pr",
         "--print_reward",
-        action="store_true",
-        help="Print the active reward each step when a reward function is provided.",
+        choices=("all", "update", "none"),
+        default="none",
+        help=(
+            "Reward printing mode: all prints every step, update prints only when the reward changes, "
+            "and none prints nothing. Default: none."
+        ),
     )
     parser.add_argument(
         "-m",
@@ -184,6 +230,7 @@ def main() -> None:
     reset_key = jrandom.fold_in(master_key, 0)
     obs, state = jitted_reset(reset_key)
     info = {}
+    reward_print_state: tuple[float | None, int] = (None, 0)
 
     if args.human_playable:
         pygame.init()
@@ -209,8 +256,13 @@ def main() -> None:
             done = bool(np.asarray(done))
             total_reward += float(reward)
 
-            if args.print_reward and reward_function is not None:
-                print(f"reward={np.asarray(reward).item()}")
+            if reward_function is not None and args.print_reward != "none":
+                reward_print_state = _update_reward_print_state(
+                    _reward_value(reward),
+                    args.print_reward,
+                    reward_print_state[0],
+                    reward_print_state[1],
+                )
 
             image = jitted_render(state)
             update_pygame(
@@ -220,6 +272,11 @@ def main() -> None:
             if done:
                 if isinstance(info, dict) and "custom_reward" in info:
                     print(f"custom_reward={np.asarray(info['custom_reward']).item()}")
+                if reward_function is not None and args.print_reward == "update":
+                    _flush_reward_print_state(
+                        args.print_reward, reward_print_state[0], reward_print_state[1]
+                    )
+                    reward_print_state = (None, 0)
                 print(f"Episode finished. Total reward: {total_reward:.3f}")
                 total_reward = 0.0
                 episode_index += 1
@@ -243,8 +300,18 @@ def main() -> None:
         done = bool(np.asarray(done))
         total_reward += float(reward)
 
-        if args.print_reward and reward_function is not None:
-            print(f"reward={np.asarray(reward).item()}")
+        if reward_function is not None and args.print_reward != "none":
+            reward_print_state = _update_reward_print_state(
+                _reward_value(reward),
+                args.print_reward,
+                reward_print_state[0],
+                reward_print_state[1],
+            )
+
+    if reward_function is not None and args.print_reward == "update":
+        _flush_reward_print_state(
+            args.print_reward, reward_print_state[0], reward_print_state[1]
+        )
 
     if isinstance(info, dict) and "custom_reward" in info:
         print(f"custom_reward={np.asarray(info['custom_reward']).item()}")
