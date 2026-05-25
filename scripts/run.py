@@ -1,11 +1,3 @@
-"""Run a JAXAtari environment from the command line.
-
-The CLI follows the repository README flow:
-base env -> optional reward override -> human control or random autoplay.
-"""
-
-from __future__ import annotations
-
 import functools
 import argparse
 import importlib.util
@@ -19,7 +11,7 @@ if "--cpu" in sys.argv:
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
