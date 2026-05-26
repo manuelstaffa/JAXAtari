@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import jax
 
 SCREEN_WIDTH = 160.0
 SCORE_REWARD = 10.0
@@ -39,7 +40,7 @@ def _proximity_reward(distance):
     return PLAYER_BALL_PROXIMITY_MAX_REWARD * shaped
 
 
-def reward_function(previous_state, state) -> float:
+def reward_function(previous_state, state) -> jax.Array:
     reward = 0.0
 
     player_score_delta = jnp.asarray(
