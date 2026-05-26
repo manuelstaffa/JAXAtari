@@ -1,0 +1,136 @@
+I want you to create a reward function for the game Freeway. 
+The environment variable are provided in context/{game}.py.
+An example reward function is also provided as sample_rf.py.
+
+The reward function is designed for the use in JaxAtari, and thus should use jax/jax.numpy wherever possible. Adhere to common code design principles. Do not add comments.
+
+The function should have the following shape:
+<constants to modify reward amounts, detection ranges, etc.>
+<optional helper functions for distance, relative positions, etc.; keep all actual reward logic in the main function>
+def reward_function(previous_state, state) -> float:
+    reward = 0.0
+    <code>
+    return reward
+
+To access game states use the states provided in the game context file and the following syntax:
+state.{attribute}
+previous_state.{attribute}
+
+The reward function should return the following signals as a singular float:
++100 for getting score/reaching the top (detected via state.score - previous_state.score)
++0.1 for moving upwards
+-0.2 for moving downwards
+scaled reward of 0 to -10 for approaching/close cars. this detection zone should be a stretched oval-like shape centered on the player, extending further left and right, about the player height in the front, and just a few pixels in the back (defined by 3 constants, so something like a weighted oval based on 4 points centered around the player). as cars get closer, the penalty exponentially gets closer to the max
+
+Generate the function as expert_reward.py in rewards/{game}.
+
+scaled reward of 0 to -1 for approaching cars on the same height as the player (use player y and a certain tolerance)
+scaled reward of 0 to -0.5 for approaching cars on a higher level as the player (use player y+the height of the previous "detection zone" and a certain tolerance). this area should be less wide than the one above
+
+
+
+
+
+
+I want you to create a reward function for the game Seaquest. 
+The environment variable are provided in context/{game}.py.
+An example reward function is also provided as sample_rf.py.
+
+The reward function is designed for the use in JaxAtari, and thus should use jax/jax.numpy wherever possible. Adhere to common code design principles. Do not add comments.
+
+The function should have the following shape:
+<constants to modify reward amounts, detection ranges, etc.>
+<optional helper functions for distance, relative positions, etc.; keep all actual reward logic in the main function>
+def reward_function(previous_state, state) -> float:
+    reward = 0.0
+    <code>
+    return reward
+
+To access game states use the states provided in the game context file and the following syntax:
+state.{attribute}
+previous_state.{attribute}
+
+The reward function should return the following signals as a singular float:
++100 surfacing with 6 (max) divers collected (successful rescue)
++10 for surfacing with >= 1 diver when oxygen is <= 10 (constant)
+-50 for surfacing with >= 1 diver when oxygen is > 10
+-100 for surfacing with 0 divers
+-100 for dying
+scaled reward of 0 to 10 for approaching/close divers. this detection zone should be a stretched oval-like shape centered on the player, extending further left and right, and less in the front and back (defined by 2 constants, so something like a weighted oval based on 4 points centered around the player). as divers get closer, the reward exponentially gets closer to the max
++5 for destroying enemies
++1 for being at a similar y level as enemy (with tolerance), facing enemy, and firing
+scaled reward of 0 to 1 for moving closer to divers (constant for max detection range)
++5 for collecting divers
+
+Generate the function as expert_reward.py in rewards/{game}.
+
+
+
+
+
+
+I want you to create a reward function for the game Pong. 
+The environment variable are provided in context/{game}.py.
+An example reward function is also provided as sample_rf.py.
+
+The reward function is designed for the use in JaxAtari, and thus should use jax/jax.numpy wherever possible. Adhere to common code design principles. Do not add comments.
+
+The function should have the following shape:
+<constants to modify reward amounts, detection ranges, etc.>
+<optional helper functions for distance, relative positions, etc.; keep all actual reward logic in the main function>
+def reward_function(previous_state, state) -> float:
+    reward = 0.0
+    <code>
+    return reward
+
+To access game states use the states provided in the game context file and the following syntax:
+state.{attribute}
+previous_state.{attribute}
+
+The reward function should return the following signals as a singular float:
++10 for scoring 
+-10 for enemy scoring
++0.1 for ball being on enemy half of screen
+-0.1 for ball being on player half of screen, unless ball is within a certain (circular) distance of player
+scaled reward of 0 to -1 for player being close to the ball. the closer the player is to the ball (max distance defined by constant, basically the same circle as the penalty above), the reward exponentially gets closer to the max
+
+Generate the function as expert_reward.py in rewards/{game}.
+
+
+
+
+
+
+I want you to create a reward function for the game Kangaroo. 
+The environment variable are provided in context/{game}.py.
+An example reward function is also provided as sample_rf.py.
+
+The reward function is designed for the use in JaxAtari, and thus should use jax/jax.numpy wherever possible. Adhere to common code design principles. Do not add comments.
+
+The function should have the following shape:
+<constants to modify reward amounts, detection ranges, etc.>
+<optional helper functions for distance, relative positions, etc.; keep all actual reward logic in the main function>
+def reward_function(previous_state, state) -> float:
+    reward = 0.0
+    <code>
+    return reward
+
+To access game states use the states provided in the game context file and the following syntax:
+state.{attribute}
+previous_state.{attribute}
+
+The reward function should return the following signals as a singular float:
++100 for reaching child
+-100 for losing a life
+scaled penalty of 0 to -1 for player being close to a coconout. the closer the player is to the coconut, the penalty exponentially gets closer to the max. for detection use two ovals (one vertical, one horizontal). the ovals should extend much further to the right/up and only a little left/down (as that is not where projectiles will come from)
++5 for killing enemy
++5 for collecting fruit
++10 for collecting last fruit
++7 for collecting bell
+scaled reward of 0 to 0.5 for moving towards child vertically (only check y unless both player and child are at a similar y distance, then check/reward x as well)
+scaled reward of 0 to 0.2 for moving towards the ladder that is on the most similar y level as the player but not below the player (as to not keep the player at the ladder they just climbed up)
++0.1 for moving up while on ladder
++0.1 for moving up (y pos)
+-0.1 for moving down (y pos)
+
+Generate the function as expert_reward.py in rewards/{game}.

@@ -1,0 +1,15 @@
+###############################################################
+Human Playable with Expert Reward
+###############################################################
+
+python scripts/run.py -g Freeway -hu -pr update -rf rewards/freeway/expert_reward.py
+
+python scripts/run.py -g Kangaroo -hu -pr update -rf rewards/kangaroo/expert_reward.py 
+
+python scripts/run.py -g MsPacman -hu -pr update -rf rewards/mspacman/expert_reward.py 
+
+python scripts/run.py -g Pong -hu -pr update -rf rewards/pong/expert_reward.py 
+
+python scripts/run.py -g Seaquest -hu -pr update -rf rewards/seaquest/expert_reward.py 
+
+python scripts/run.py -g Skiing -hu -pr update -rf rewards/skiing/expert_reward.py 
