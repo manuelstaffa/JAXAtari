@@ -68,7 +68,6 @@ Generate the function as expert_reward.py in rewards/{game}.
 
 
 
-
 I want you to create a reward function for the game Pong. 
 The environment variable are provided in context/{game}.py.
 An example reward function is also provided as sample_rf.py.
@@ -132,5 +131,83 @@ scaled reward of 0 to 0.2 for moving towards the ladder that is on the most simi
 +0.1 for moving up while on ladder
 +0.1 for moving up (y pos)
 -0.1 for moving down (y pos)
+
+Generate the function as expert_reward.py in rewards/{game}.
+
+
+
+
+
+
+I want you to create a reward function for the game MsPacman.
+The environment variable are provided in context/{game}.py.
+An example reward function is also provided as sample_rf.py.
+
+The reward function is designed for the use in JaxAtari, and thus should use jax/jax.numpy wherever possible. Adhere to common code design principles. Do not add comments.
+
+The function should have the following shape:
+<constants to modify reward amounts, detection ranges, etc.>
+<optional helper functions for distance, relative positions, etc.; keep all actual reward logic in the main function>
+def reward_function(previous_state, state) -> float:
+    reward = 0.0
+    <code>
+    return reward
+
+To access game states use the states provided in the game context file and the following syntax:
+state.{attribute}
+previous_state.{attribute}
+
+The reward function should return the following signals as a singular float:
+direct rewards:
++1 for collecting pellets
++5 for collecting a power pellet
++10 for eating a ghost while powered
++5 for collecting fruit
++100 for clearing a level
+-100 for losing a life
+scaled reward of 0 to 1 for moving towards the nearest pellet
+scaled reward of 0 to 1 for moving towards the nearest power pill when one is available
+scaled reward of 0 to 2 for moving towards a nearby fruit when it is spawned
+scaled penalty of 0 to -1 for moving closer to an active ghost
+scaled reward of 0 to 1 for moving towards a ghost while powered by pill
+
+Generate the function as expert_reward.py in rewards/{game}.
+
+
+
+
+
+
+I want you to create a reward function for the game Skiing.
+The environment variable are provided in context/{game}.py.
+An example reward function is also provided as sample_rf.py.
+
+The reward function is designed for the use in JaxAtari, and thus should use jax/jax.numpy wherever possible. Adhere to common code design principles. Do not add comments.
+
+The function should have the following shape:
+<constants to modify reward amounts, detection ranges, etc.>
+<optional helper functions for distance, relative positions, etc.; keep all actual reward logic in the main function>
+def reward_function(previous_state, state) -> float:
+    reward = 0.0
+    <code>
+    return reward
+
+To access game states use the states provided in the game context file and the following syntax:
+state.{attribute}
+previous_state.{attribute}
+
+The reward function should return the following signals as a singular float:
+direct rewards:
++20 for successfully passing a gate (state.successful_gates - previous_state.successful_gates)
+-10 for missing a gate (delta in flags_passed that is not a successful gate)
+-25 for colliding with a tree or flag pole
+-10 for colliding with a mogul while not jumping
+-100 for falling (skier_fell transitions to true)
+-200 for game over
+scaled reward of 0 to 1 for aligning skier x-position with the center of the nearest upcoming gate
+scaled reward of 0 to 0.5 for maintaining forward progress using skier_y_speed
+scaled penalty of 0 to -0.5 for excessive zig-zagging based on direction_change_counter increase
+scaled penalty of 0 to -1 for approaching trees and moguls in a forward-facing stretched detection zone
+scaled reward of 0 to 0.5 for jumping over nearby moguls without collision
 
 Generate the function as expert_reward.py in rewards/{game}.
