@@ -266,7 +266,6 @@ def main() -> None:
         total_reward = 0.0
         episode_index = 0
 
-        # For stepping mode: maintain state history
         state_history = [state] if args.step else []
         history_index = 0 if args.step else 0
         reward_history: list[float] = [] if args.step else []
@@ -321,7 +320,6 @@ def main() -> None:
             action = _map_action_to_index(env, action_constant)
             obs, state, reward, done, info = jitted_step(state, action)
 
-            # Store in history for stepping mode
             if args.step:
                 state_history.append(state)
                 reward_history.append(float(reward))
@@ -357,7 +355,6 @@ def main() -> None:
                 reset_key = jrandom.fold_in(master_key, episode_index)
                 obs, state = jitted_reset(reset_key)
 
-                # Reset stepping history for new episode
                 if args.step:
                     state_history = [state]
                     reward_history = []
@@ -374,7 +371,6 @@ def main() -> None:
     total_reward = 0.0
     step_count = 0
 
-    # For stepping mode in non-human-playable: maintain state history
     state_history = [state] if args.step else []
     reward_history: list[float] = [] if args.step else []
     history_index = 0 if args.step else 0
@@ -383,7 +379,6 @@ def main() -> None:
         print("[STEP] Press 'n' for one step forward or 'b' for one step back.")
 
     while not done:
-        # Handle stepping mode in non-human-playable
         if args.step:
             user_input = input(f"[Step {step_count}] > ").strip().lower()
             if user_input == "b":
@@ -405,7 +400,6 @@ def main() -> None:
         action_key, _ = jrandom.split(action_key)
         obs, state, reward, done, info = jitted_step(state, action)
 
-        # Store in history for stepping mode
         if args.step:
             state_history.append(state)
             reward_history.append(float(reward))
