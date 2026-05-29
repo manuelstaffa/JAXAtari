@@ -16,16 +16,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-import jax
-import jax.numpy as jnp
-import jax.random as jrandom
-import numpy as np
-import pygame
+import jax  # noqa: E402
+import jax.numpy as jnp  # noqa: E402
+import jax.random as jrandom  # noqa: E402
+import numpy as np  # noqa: E402
+import pygame  # noqa: E402
 
-from jaxatari.core import make as jaxatari_make
-from jaxatari.wrappers import JaxatariWrapper
+from jaxatari.core import make as jaxatari_make  # noqa: E402
+from jaxatari.wrappers import JaxatariWrapper  # noqa: E402
 
-from scripts.utils import get_human_action, update_pygame
+from scripts.utils import get_human_action, update_pygame  # noqa: E402
 
 UPSCALE_FACTOR = 8
 
@@ -116,6 +116,29 @@ def _flush_reward_print_state(
         _print_reward_update(previous_reward, count)
 
 
+def _get_held_step_command() -> str | None:
+    """Return the currently held continuous stepping key, if any."""
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_h]:
+        return "BACK"
+    if keys[pygame.K_j]:
+        return "NEXT"
+    return None
+
+
+def _get_single_step_command() -> str | None:
+    """Return a one-shot stepping command from key press events, if any."""
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            raise SystemExit
+        if event.type == pygame.KEYDOWN and not getattr(event, "repeat", False):
+            if event.key == pygame.K_b:
+                return "BACK"
+            if event.key == pygame.K_n:
+                return "NEXT"
+    return None
+
+
 class RewardOverrideWrapper(JaxatariWrapper):
     """Replace the base environment reward with a custom callable."""
 
@@ -202,6 +225,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0, help="Random seed.")
     parser.add_argument("--cpu", action="store_true", help="Run JAX on CPU.")
     parser.add_argument("--fps", type=int, default=30, help="Render frame rate.")
+    parser.add_argument(
+        "-s",
+        "--step",
+        action="store_true",
+        help="Enable step-by-step execution. Press 'n' to advance, 'b' to go back.",
+    )
     args = parser.parse_args()
 
     mods = _normalize_items(args.modifs) or []
@@ -237,7 +266,53 @@ def main() -> None:
         total_reward = 0.0
         episode_index = 0
 
+        # For stepping mode: maintain state history
+        state_history = [state] if args.step else []
+        history_index = 0 if args.step else 0
+        reward_history: list[float] = [] if args.step else []
+
+        if args.step:
+            print(
+                "[STEP] Press 'n'/'b' for one step; hold 'j'/'h' for continuous forward/back."
+            )
+
         while running:
+            if not running:
+                break
+
+            if args.step:
+                try:
+                    step_cmd = _get_single_step_command()
+                except SystemExit:
+                    break
+
+                if step_cmd is None:
+                    step_cmd = _get_held_step_command()
+
+                if step_cmd == "BACK":
+                    if history_index > 0:
+                        history_index -= 1
+                        total_reward -= reward_history[history_index]
+                        state = state_history[history_index]
+                        image = jitted_render(state)
+                        update_pygame(
+                            window,
+                            image,
+                            UPSCALE_FACTOR,
+                            int(image.shape[1]),
+                            int(image.shape[0]),
+                        )
+                    clock.tick(args.fps)
+                    continue
+
+                if step_cmd != "NEXT":
+                    clock.tick(args.fps)
+                    continue
+
+                if history_index < len(state_history) - 1:
+                    state_history = state_history[: history_index + 1]
+                    reward_history = reward_history[:history_index]
+
             try:
                 action_constant = get_human_action()
             except SystemExit:
@@ -245,6 +320,13 @@ def main() -> None:
 
             action = _map_action_to_index(env, action_constant)
             obs, state, reward, done, info = jitted_step(state, action)
+
+            # Store in history for stepping mode
+            if args.step:
+                state_history.append(state)
+                reward_history.append(float(reward))
+                history_index = len(state_history) - 1
+
             done = bool(np.asarray(done))
             total_reward += float(reward)
 
@@ -275,6 +357,12 @@ def main() -> None:
                 reset_key = jrandom.fold_in(master_key, episode_index)
                 obs, state = jitted_reset(reset_key)
 
+                # Reset stepping history for new episode
+                if args.step:
+                    state_history = [state]
+                    reward_history = []
+                    history_index = 0
+
             clock.tick(args.fps)
 
         pygame.quit()
@@ -284,11 +372,46 @@ def main() -> None:
     action_key = jrandom.fold_in(master_key, 1_000_000)
     done = False
     total_reward = 0.0
+    step_count = 0
+
+    # For stepping mode in non-human-playable: maintain state history
+    state_history = [state] if args.step else []
+    reward_history: list[float] = [] if args.step else []
+    history_index = 0 if args.step else 0
+
+    if args.step:
+        print("[STEP] Press 'n' for one step forward or 'b' for one step back.")
 
     while not done:
+        # Handle stepping mode in non-human-playable
+        if args.step:
+            user_input = input(f"[Step {step_count}] > ").strip().lower()
+            if user_input == "b":
+                if history_index > 0:
+                    history_index -= 1
+                    total_reward -= reward_history[history_index]
+                    state = state_history[history_index]
+                    continue
+            elif user_input == "q":
+                break
+            elif user_input not in ("", "n"):
+                continue
+
+            if history_index < len(state_history) - 1:
+                state_history = state_history[: history_index + 1]
+                reward_history = reward_history[:history_index]
+
         action = action_space.sample(action_key)
         action_key, _ = jrandom.split(action_key)
         obs, state, reward, done, info = jitted_step(state, action)
+
+        # Store in history for stepping mode
+        if args.step:
+            state_history.append(state)
+            reward_history.append(float(reward))
+            history_index = len(state_history) - 1
+            step_count += 1
+
         done = bool(np.asarray(done))
         total_reward += float(reward)
 
