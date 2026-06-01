@@ -35,9 +35,3 @@ Run a JAXAtari environment in either random-agent mode (default) or keyboard-con
 | `--seed` | `0` | `int` | Master PRNG seed used for reset/action keys. |
 | `--cpu` | `False` | flag | Requests CPU backend by setting JAX-related env vars before JAX import. |
 | `--fps` | `30` | `int` | Target render/update rate used in pygame loop (`clock.tick(fps)`). |
-
-## Notes
-
-- With a custom reward function enabled, `info` includes both `base_reward` and `custom_reward`.
-- At episode end, total reward is printed in both human and non-human modes.
-- In human mode, episodes auto-reset after terminal states.
