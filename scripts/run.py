@@ -90,6 +90,8 @@ def _update_reward_print_state(
     previous_reward: float | None,
     count: int,
 ) -> tuple[float | None, int]:
+    reward_value = round(reward_value, 5)
+
     if mode == "all":
         print(f"reward={reward_value}")
         return previous_reward, count
