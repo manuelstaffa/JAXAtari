@@ -6,6 +6,15 @@ import sys
 from pathlib import Path
 from typing import Callable, Iterable
 
+import jax
+import jax.numpy as jnp
+import jax.random as jrandom
+import numpy as np
+import pygame
+
+from jaxatari.core import make as jaxatari_make
+from jaxatari.wrappers import JaxatariWrapper
+
 if "--cpu" in sys.argv:
     os.environ.setdefault("JAX_PLATFORMS", "cpu")
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
@@ -15,15 +24,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-
-import jax  # noqa: E402
-import jax.numpy as jnp  # noqa: E402
-import jax.random as jrandom  # noqa: E402
-import numpy as np  # noqa: E402
-import pygame  # noqa: E402
-
-from jaxatari.core import make as jaxatari_make  # noqa: E402
-from jaxatari.wrappers import JaxatariWrapper  # noqa: E402
 
 from scripts.utils import get_human_action, update_pygame  # noqa: E402
 
