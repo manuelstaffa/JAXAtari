@@ -9,18 +9,19 @@ from rewards.kangaroo.expert_reward import (
 
 LIFE_LOSS_PENALTY = -100.0
 SURFACE_RESCUE_REWARD = 100.0
-SURFACE_LOW_OXYGEN_REWARD = 10.0
+SURFACE_LOW_OXYGEN_REWARD = 20.0
 SURFACE_HIGH_OXYGEN_PENALTY = -50.0
 SURFACE_EMPTY_PENALTY = -100.0
+LOW_OXYGEN_THRESHOLD = 15
 
-DIVER_MAX_REWARD = 8.0
+DIVER_MAX_REWARD = 0.2
+DIVER_HORIZONTAL_RADIUS = 150.0
+DIVER_VERTICAL_RADIUS = 100.0
 
-ENEMY_MAX_PENALTY = -5.0
-ENEMY_HORIZONTAL_RADIUS = 50.0
+ENEMY_MAX_PENALTY = -0.5
+ENEMY_HORIZONTAL_RADIUS = 80.0
 ENEMY_VERTICAL_RADIUS = 20.0
 
-ENEMY_FIRING_REWARD = 0.1
-ENEMY_FIRING_Y_TOLERANCE = 8.0
 ENEMY_KILL_REWARD = 10.0
 
 
@@ -117,38 +118,38 @@ def reward_function(previous_state, state) -> jax.Array:
 
     # Life loss penalty
     lives_delta = state.lives - previous_state.lives
-    reward += jnp.where(lives_delta < 0, lives_delta * LIFE_LOSS_PENALTY, 0.0)
+    reward += jnp.where(lives_delta < 0, LIFE_LOSS_PENALTY, 0.0)
 
     # Surface reward/penalty
-    reward += jnp.where(
-        state.just_surfaced,
+    surfaced = jnp.logical_and(state.just_surfaced, previous_state.just_surfaced == 0)
+    surface_reward = jnp.where(
+        previous_state.divers_collected >= 6,
+        SURFACE_RESCUE_REWARD,
         jnp.where(
             previous_state.divers_collected > 0,
             jnp.where(
-                previous_state.oxygen <= 10,
+                previous_state.oxygen <= LOW_OXYGEN_THRESHOLD,
                 SURFACE_LOW_OXYGEN_REWARD,
                 SURFACE_HIGH_OXYGEN_PENALTY,
             ),
             SURFACE_EMPTY_PENALTY,
         ),
-        0.0,
     )
-
-    successful_rescue_delta = (
-        state.successful_rescues - previous_state.successful_rescues
-    )
-    reward += jnp.where(
-        successful_rescue_delta > 0,
-        successful_rescue_delta * SURFACE_RESCUE_REWARD,
-        0.0,
-    )
+    reward += jnp.where(surfaced, surface_reward, 0.0)
 
     # Diver approach reward
     diver_positions = jnp.asarray(state.diver_positions, dtype=jnp.float32)
     diver_reward_strength = jax.vmap(
-        lambda diver: _exponential_distance(player_pos, diver)
+        lambda diver: _asymmetric_ellipse_exponential_distance(
+            player_pos,
+            diver,
+            DIVER_HORIZONTAL_RADIUS,
+            DIVER_HORIZONTAL_RADIUS,
+            DIVER_VERTICAL_RADIUS,
+            DIVER_VERTICAL_RADIUS,
+        )
     )(diver_positions)
-    reward += jnp.max(diver_reward_strength) * state.divers_collected * DIVER_MAX_REWARD
+    reward += jnp.max(diver_reward_strength) * DIVER_MAX_REWARD
 
     # Enemy proximity penalty
     enemy_positions = jnp.concatenate(
@@ -172,31 +173,6 @@ def reward_function(previous_state, state) -> jax.Array:
     reward += jnp.max(enemy_penalty_strength) * ENEMY_MAX_PENALTY
 
     # Enemy kill reward
-    missile_pos = jnp.asarray(state.player_missile_position[:2], dtype=jnp.float32)
-    previous_missile_pos = jnp.asarray(
-        previous_state.player_missile_position[:2], dtype=jnp.float32
-    )
-    missile_delta_x = missile_pos[0] - previous_missile_pos[0]
-
-    kill_reward_strength = jax.vmap(
-        lambda enemy: jnp.where(
-            jnp.logical_and(
-                jnp.logical_and(
-                    jnp.abs(missile_pos[1] - enemy[1]) <= ENEMY_FIRING_Y_TOLERANCE,
-                    jnp.sign(missile_delta_x) == jnp.sign(enemy[0] - missile_pos[0]),
-                ),
-                jnp.where(
-                    missile_delta_x >= 0,
-                    enemy[0] >= missile_pos[0],
-                    enemy[0] <= missile_pos[0],
-                ),
-            ),
-            _exponential_distance(missile_pos, enemy[:2]),
-            -1.0,
-        )
-    )(enemy_positions)
-    reward += jnp.max(kill_reward_strength) * ENEMY_FIRING_REWARD
-
     reward += jnp.where(
         jnp.logical_and(state.score > previous_state.score, state.death_counter == 0),
         ENEMY_KILL_REWARD,
