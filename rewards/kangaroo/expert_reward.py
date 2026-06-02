@@ -25,10 +25,10 @@ MOVE_UP_REWARD = 0.1
 MOVE_DOWN_PENALTY = -0.15
 
 
-def _linear_distance(a, b, alpha: float = 0.005) -> jax.Array:
+def _linear_distance(a, b, max_distance: float) -> jax.Array:
     try:
         distance = jnp.sqrt(jnp.sum((a - b) ** 2))
-        val = jnp.maximum(0.0, 1.0 - alpha * distance)
+        val = jnp.maximum(0.0, 1.0 - distance / max_distance)
 
         return jnp.asarray(val, dtype=jnp.float32)
     except (TypeError, IndexError):
@@ -123,6 +123,7 @@ def reward_function(previous_state, state) -> jax.Array:
     child_vertical_reward_strength = _linear_distance(
         player_center[1],
         state.level.child_position[1],
+        200.0,
     )
     reward += child_vertical_reward_strength * CHILD_MAX_REWARD
 
@@ -151,6 +152,7 @@ def reward_function(previous_state, state) -> jax.Array:
     reward += LADDER_MAX_REWARD * _linear_distance(
         player_center,
         ladder_positions[target_idx],
+        200.0,
     )
 
     reward += jnp.where(

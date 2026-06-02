@@ -165,11 +165,11 @@ direct rewards:
 +5 for collecting fruit
 +100 for clearing a level
 -100 for losing a life
-scaled reward of 0 to 1 for moving towards the nearest pellet
-scaled reward of 0 to 1 for moving towards the nearest power pill when one is available
-scaled reward of 0 to 2 for moving towards a nearby fruit when it is spawned
-scaled penalty of 0 to -1 for moving closer to an active ghost
-scaled reward of 0 to 1 for moving towards a ghost while powered by pill
+scaled reward of 0 to 0.1 for moving towards the nearest pellet
+scaled reward of 0 to 0.5 for moving towards the nearest power pill when one is available
+scaled reward of 0 to 0.2 for moving towards a nearby fruit when it is spawned
+scaled penalty of 0 to -0.5 for moving closer to an active ghost
+scaled reward of 0 to 0.2 for moving towards a ghost while powered by pill
 
 Generate the function as expert_reward.py in rewards/{game}.
 

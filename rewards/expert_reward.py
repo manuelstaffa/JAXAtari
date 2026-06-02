@@ -12,15 +12,13 @@ def _linear_distance(a, b, alpha: float = 0.005) -> jax.Array:
         return jnp.asarray(0.0, dtype=jnp.float32)
 
 
-def _exponential_distance(a, b, alpha: float = 0.05) -> jax.Array:
-    try:
-        distance = jnp.sqrt(jnp.sum((a - b) ** 2))
-        exp_min = jnp.exp(-alpha)
-        val = (jnp.exp(-alpha * distance) - exp_min) / (1.0 - exp_min)
+def _exponential_distance(a, b, max_distance, alpha=0.05):
+    distance = jnp.linalg.norm(a - b)
 
-        return jnp.asarray(val, dtype=jnp.float32)
-    except (TypeError, IndexError):
-        return jnp.asarray(0.0, dtype=jnp.float32)
+    exp_max = 1.0
+    exp_min = jnp.exp(-alpha * max_distance)
+
+    return (jnp.exp(-alpha * distance) - exp_min) / (exp_max - exp_min)
 
 
 def _in_ellipse(a, b, horizontal_radius, vertical_radius) -> jax.Array:
