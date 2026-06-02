@@ -6,7 +6,7 @@ LOSE_LIFE_PENALTY = -100.0
 
 COCONUT_MAX_PENALTY = -1.0
 COCONUT_LONG_RADIUS = 110.0
-COCONUT_SHORT_RADIUS = 20.0
+COCONUT_SHORT_RADIUS = 30.0
 
 ENEMY_REWARD = 5.0
 FRUIT_REWARD = 6.0
@@ -145,18 +145,18 @@ def reward_function(previous_state, state) -> jax.Array:
     )(thrown_cocos)
     reward += jnp.max(coco_penalty_strength) * COCONUT_MAX_PENALTY
 
-    falling_cocos = jnp.asarray(state.level.falling_coco_position, dtype=jnp.float32)
+    falling_cocos = state.level.falling_coco_position[jnp.newaxis, :]
     coco_penalty_strength = jax.vmap(
         lambda coco: _asymmetric_ellipse_exponential_distance(
             player_center,
             coco,
             COCONUT_SHORT_RADIUS,
-            COCONUT_LONG_RADIUS,
             COCONUT_SHORT_RADIUS,
+            COCONUT_LONG_RADIUS,
             COCONUT_SHORT_RADIUS,
         )
     )(falling_cocos)
-    reward += jnp.max(coco_penalty_strength) * COCONUT_MAX_PENALTY
+    reward += jnp.sum(coco_penalty_strength) * COCONUT_MAX_PENALTY
 
     # Enemy kill reward
     monkey_kills = jnp.sum(
@@ -198,9 +198,6 @@ def reward_function(previous_state, state) -> jax.Array:
 
     # Ladder climbing reward
     ladder_positions = jnp.asarray(state.level.ladder_positions, dtype=jnp.float32)
-    print("ladder_positions:", ladder_positions)
-    ladder_sizes = jnp.asarray(state.level.ladder_sizes, dtype=jnp.float32)
-    print("ladder_sizes:", ladder_sizes)
     player_bottom = state.player.y + jnp.asarray(state.player.height, dtype=jnp.float32)
     target_idx = jnp.argmin(
         jnp.where(
@@ -209,14 +206,10 @@ def reward_function(previous_state, state) -> jax.Array:
             jnp.inf,
         )
     )
-    """target_center = ladder_positions[target_idx] + jnp.array(
-        [0.0, ladder_sizes[target_idx] * 0.5],
-        dtype=jnp.float32,
-    )
     reward += LADDER_MAX_REWARD * _linear_distance(
         player_center,
-        target_center,
-    )"""
+        ladder_positions[target_idx],
+    )
 
     reward += jnp.where(
         state.player.is_climbing & (state.player.y < previous_state.player.y),
