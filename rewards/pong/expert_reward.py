@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
 
+SCORE_REWARD = 100.0
+
 
 def _linear_distance(a, b, alpha: float = 0.005) -> jax.Array:
     distance = jnp.sqrt(jnp.sum((a - b) ** 2))
@@ -79,5 +81,14 @@ def _asymmetric_ellipse_exponential_distance(
 
 def reward_function(previous_state, state) -> jax.Array:
     reward = jnp.asarray(0.0, dtype=jnp.float32)
+
+    player_score_delta = jnp.asarray(
+        state.player_score - previous_state.player_score, dtype=jnp.float32
+    )
+    enemy_score_delta = jnp.asarray(
+        state.enemy_score - previous_state.enemy_score, dtype=jnp.float32
+    )
+    reward += SCORE_REWARD * player_score_delta
+    reward -= SCORE_REWARD * enemy_score_delta
 
     return jnp.asarray(reward, dtype=jnp.float32)
