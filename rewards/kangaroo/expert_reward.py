@@ -56,7 +56,7 @@ def _in_ellipse(a, b, horizontal_radius, vertical_radius) -> jax.Array:
 
         return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
     except (TypeError, IndexError):
-        return jnp.asarray(0.0, dtype=jnp.float32)
+        return jnp.asarray(False, dtype=jnp.bool)
 
 
 def _in_asymmetric_ellipse(
@@ -73,7 +73,7 @@ def _in_asymmetric_ellipse(
 
         return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
     except (TypeError, IndexError):
-        return jnp.asarray(0.0, dtype=jnp.float32)
+        return jnp.asarray(False, dtype=jnp.bool)
 
 
 def _asymmetric_ellipse_linear_distance(

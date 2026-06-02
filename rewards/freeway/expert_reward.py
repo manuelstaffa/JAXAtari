@@ -13,32 +13,37 @@ DOWN_RADIUS = 15.0
 
 
 def _linear_distance(a, b, alpha: float = 0.005) -> jax.Array:
-    """
-    Linear inversed norm distance between two points a and b, scaled by alpha. Maximum distance that gives non-zero reward is 1/alpha.
-    """
-    distance = jnp.sqrt(jnp.sum((a - b) ** 2))
-    val = jnp.maximum(0.0, 1.0 - alpha * distance)
+    try:
+        distance = jnp.sqrt(jnp.sum((a - b) ** 2))
+        val = jnp.maximum(0.0, 1.0 - alpha * distance)
 
-    return jnp.asarray(val, dtype=jnp.float32)
+        return jnp.asarray(val, dtype=jnp.float32)
+    except (TypeError, IndexError):
+        return jnp.asarray(0.0, dtype=jnp.float32)
 
 
 def _exponential_distance(a, b, alpha: float = 0.05) -> jax.Array:
-    """
-    Exponential inversed norm distance between two points a and b, scaled by alpha.
-    """
-    distance = jnp.sqrt(jnp.sum((a - b) ** 2))
-    exp_min = jnp.exp(-alpha)
-    val = (jnp.exp(-alpha * distance) - exp_min) / (1.0 - exp_min)
+    try:
+        distance = jnp.sqrt(jnp.sum((a - b) ** 2))
+        exp_min = jnp.exp(-alpha)
+        val = (jnp.exp(-alpha * distance) - exp_min) / (1.0 - exp_min)
 
-    return jnp.asarray(val, dtype=jnp.float32)
+        return jnp.asarray(val, dtype=jnp.float32)
+    except (TypeError, IndexError):
+        return jnp.asarray(0.0, dtype=jnp.float32)
 
 
 def _in_ellipse(a, b, horizontal_radius, vertical_radius) -> jax.Array:
-    horizontal_term = (a[0] - b[0]) / horizontal_radius
-    vertical_term = (a[1] - b[1]) / vertical_radius
-    ellipse_distance = horizontal_term * horizontal_term + vertical_term * vertical_term
+    try:
+        horizontal_term = (a[0] - b[0]) / horizontal_radius
+        vertical_term = (a[1] - b[1]) / vertical_radius
+        ellipse_distance = (
+            horizontal_term * horizontal_term + vertical_term * vertical_term
+        )
 
-    return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
+        return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
+    except (TypeError, IndexError):
+        return jnp.asarray(False, dtype=jnp.bool)
 
 
 def _in_asymmetric_ellipse(
@@ -55,7 +60,7 @@ def _in_asymmetric_ellipse(
 
         return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
     except (TypeError, IndexError):
-        return jnp.asarray(0.0, dtype=jnp.float32)
+        return jnp.asarray(False, dtype=jnp.bool)
 
 
 def _asymmetric_ellipse_linear_distance(
@@ -94,16 +99,18 @@ def _asymmetric_ellipse_exponential_distance(
 
 
 def reward_function(previous_state, state) -> jax.Array:
-    print("test")
     reward = jnp.asarray(0.0, dtype=jnp.float32)
 
+    # Score-based reward
     delta_score = state.score - previous_state.score
     reward += jnp.where(delta_score > 0, state.score * GOAL_REWARD, 0.0)
 
+    # Movement reward/penalty
     delta_y = state.chicken_y - previous_state.chicken_y
     reward += jnp.where(delta_y < 0, MOVE_UP_REWARD, 0.0)
     reward += jnp.where(delta_y > 0, MOVE_DOWN_PENALTY, 0.0)
 
+    # Car proximity penalty
     car_positions = jnp.asarray(state.cars, dtype=jnp.float32)
     chicken_pos = jnp.array([44.0, state.chicken_y], dtype=jnp.float32)
     car_penalty_strength = jax.vmap(
