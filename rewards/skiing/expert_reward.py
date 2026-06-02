@@ -14,14 +14,7 @@ ZIGZAG_MAX_PENALTY = -0.5
 HAZARD_MAX_PENALTY = -1.0
 JUMP_MAX_REWARD = 0.5
 
-SKIER_WIDTH = 10.0
-SKIER_HEIGHT = 18.0
 SKIER_Y = 46.0
-FLAG_CENTER_OFFSET = 16.0
-TREE_CENTER_OFFSET_X = 8.0
-TREE_CENTER_OFFSET_Y = 15.0
-MOGUL_CENTER_OFFSET_X = 8.0
-MOGUL_CENTER_OFFSET_Y = 3.5
 
 ALIGNMENT_X_RADIUS = 16.0
 ALIGNMENT_Y_RADIUS = 60.0
@@ -36,6 +29,11 @@ MOGUL_HAZARD_BACKWARD_Y_RADIUS = 14.0
 JUMP_MOGUL_X_RADIUS = 24.0
 JUMP_MOGUL_FORWARD_Y_RADIUS = 92.0
 JUMP_MOGUL_BACKWARD_Y_RADIUS = 16.0
+
+# replace above with this?
+HAZARD_UP_RADIUS = 80.0
+HAZARD_DOWN_RADIUS = 20.0
+HAZARD_HORIZONTAL_RADIUS = 35.0
 
 
 def _linear_distance(a, b, alpha: float = 0.005) -> jax.Array:
@@ -154,14 +152,9 @@ def reward_function(previous_state, state) -> jax.Array:
         0.0,
     )
 
-    skier_center_x = (
-        jnp.asarray(state.skier_x, dtype=jnp.float32) + jnp.float32(SKIER_WIDTH) * 0.5
-    )
-    skier_center = jnp.array([skier_center_x, jnp.float32(SKIER_Y)], dtype=jnp.float32)
+    skier_center = jnp.array([state.skier_x, jnp.float32(SKIER_Y)], dtype=jnp.float32)
 
-    gate_x = jnp.asarray(state.flags[:, 0], dtype=jnp.float32) + jnp.float32(
-        FLAG_CENTER_OFFSET
-    )
+    gate_x = jnp.asarray(state.flags[:, 0], dtype=jnp.float32)
     gate_y = jnp.asarray(state.flags[:, 1], dtype=jnp.float32)
     active_mask = gate_y >= jnp.float32(-15.0)
     upcoming_mask = jnp.logical_and(
@@ -216,10 +209,8 @@ def reward_function(previous_state, state) -> jax.Array:
 
     tree_centers = jnp.stack(
         [
-            jnp.asarray(state.trees[:, 0], dtype=jnp.float32)
-            + jnp.float32(TREE_CENTER_OFFSET_X),
-            jnp.asarray(state.trees[:, 1], dtype=jnp.float32)
-            + jnp.float32(TREE_CENTER_OFFSET_Y),
+            jnp.asarray(state.trees[:, 0], dtype=jnp.float32),
+            jnp.asarray(state.trees[:, 1], dtype=jnp.float32),
         ],
         axis=1,
     )
@@ -236,10 +227,8 @@ def reward_function(previous_state, state) -> jax.Array:
 
     mogul_centers = jnp.stack(
         [
-            jnp.asarray(state.moguls[:, 0], dtype=jnp.float32)
-            + jnp.float32(MOGUL_CENTER_OFFSET_X),
-            jnp.asarray(state.moguls[:, 1], dtype=jnp.float32)
-            + jnp.float32(MOGUL_CENTER_OFFSET_Y),
+            jnp.asarray(state.moguls[:, 0], dtype=jnp.float32),
+            jnp.asarray(state.moguls[:, 1], dtype=jnp.float32),
         ],
         axis=1,
     )
