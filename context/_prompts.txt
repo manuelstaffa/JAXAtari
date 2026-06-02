@@ -217,4 +217,4 @@ Generate the function as expert_reward.py in rewards/{game}.
 
 
 
-I want you to create the reward function for Knagaroo. Follow the coding style from the freeway/expert/reward.py. Do not add any other helper functions. Do not modify helper functions. Use the accessible variables in kanagroo.py as reference. Keep the code as simple as possible, with a separate part in reward function for each feature (as in the freeway example).
+I want you to create the reward function for Kangaroo. Follow the coding style from the freeway/expert/reward.py. Do not add any other helper functions. Do not modify helper functions. Use the accessible variables in kanagroo.py as reference. Keep the code as simple as possible, with a separate part in reward function for each feature (as in the freeway example).
