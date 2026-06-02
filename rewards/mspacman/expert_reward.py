@@ -10,23 +10,16 @@ LIFE_LOSS_PENALTY = -100.0
 
 PELLET_MAX_REWARD = 0.1
 PELLET_RADIUS = 150.0
-
 POWER_PELLET_MAX_REWARD = 0.5
 POWER_PELLET_RADIUS = 150.0
-
 FRUIT_MAX_REWARD = 0.2
 FRUIT_RADIUS = 120.0
-
 ACTIVE_GHOST_MAX_PENALTY = -0.5
 GHOST_RADIUS = 150.0
-
-POWERED_GHOST_MAX_REWARD = 0.2
+POWERED_GHOST_MAX_REWARD = 0.5
 POWERED_GHOST_RADIUS = 100.0
 
-PELLET_GRID_WIDTH = 8.0
-PELLET_GRID_HEIGHT = 12.0
-PELLET_CENTER_X_OFFSET = 2.0
-PELLET_CENTER_Y_OFFSET = 6.0
+PELLET_GRID_SIZE = 16.0  # TODO: check
 
 
 def _asymmetric_ellipse_exponential_distance(
@@ -84,6 +77,18 @@ def reward_function(previous_state, state) -> jax.Array:
     reward += jnp.where(fruit_collected, FRUIT_REWARD, 0.0)
 
     # Pellet proximity reward
+    pellets = jnp.asarray(state.level.pellets, dtype=jnp.bool_)
+    x_idx = jnp.arange(pellets.shape[0], dtype=jnp.float32)
+    y_idx = jnp.arange(pellets.shape[1], dtype=jnp.float32)
+    grid_x, grid_y = jnp.meshgrid(x_idx, y_idx, indexing="ij")
+    pellet_positions = jnp.stack(
+        (
+            grid_x * PELLET_GRID_SIZE,
+            grid_y * PELLET_GRID_SIZE,
+        ),
+        axis=-1,
+    ).reshape(-1, 2)
+    pellet_mask = pellets.reshape(-1)
     pellet_strength = jax.vmap(
         lambda pellet: _asymmetric_ellipse_exponential_distance(
             player_pos,
@@ -93,11 +98,8 @@ def reward_function(previous_state, state) -> jax.Array:
             PELLET_RADIUS,
             PELLET_RADIUS,
         )
-    )(state.level.pellets)
-    reward += (
-        jnp.max(jnp.where(state.level.pellets.reshape(-1), pellet_strength, 0.0))
-        * PELLET_MAX_REWARD
-    )
+    )(pellet_positions)
+    reward += jnp.max(jnp.where(pellet_mask, pellet_strength, 0.0)) * PELLET_MAX_REWARD
 
     # Power pellet proximity reward
     power_pellet_positions = jnp.array(
