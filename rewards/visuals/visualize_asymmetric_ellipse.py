@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 
 # Global parameters (tweak these)
 CENTER = np.array([50.0, 50.0])
-HORIZONTAL_RADIUS = 40.0
+LEFT_RADIUS = 40.0
+RIGHT_RADIUS = 40.0
 FRONT_RADIUS = 12.0  # used when point_y < center_y
 BACK_RADIUS = 6.0  # used when point_y >= center_y
 GRID_RES = 600
@@ -19,12 +20,15 @@ SAVE_PNG = False
 OUTPUT_FILE = "asymmetric_ellipse.png"
 
 
-def in_asymmetric_ellipse(pts, center, horizontal_radius, front_radius, back_radius):
+def in_asymmetric_ellipse(
+    pts, center, left_radius, right_radius, front_radius, back_radius
+):
     """Vectorized test for points inside the asymmetric ellipse.
 
     pts: array of shape (..., 2) representing x,y coordinates.
     Returns boolean array of shape pts[...,0].
     """
+    horizontal_radius = np.where(pts[..., 0] < center[0], left_radius, right_radius)
     horizontal_term = (pts[..., 0] - center[0]) / horizontal_radius
     vertical_radius = np.where(pts[..., 1] < center[1], front_radius, back_radius)
     vertical_term = (pts[..., 1] - center[1]) / vertical_radius
@@ -33,8 +37,8 @@ def in_asymmetric_ellipse(pts, center, horizontal_radius, front_radius, back_rad
 
 
 def main():
-    x_min = CENTER[0] - HORIZONTAL_RADIUS * 1.6
-    x_max = CENTER[0] + HORIZONTAL_RADIUS * 1.6
+    x_min = CENTER[0] - max(LEFT_RADIUS, RIGHT_RADIUS) * 1.6
+    x_max = CENTER[0] + max(LEFT_RADIUS, RIGHT_RADIUS) * 1.6
     y_extent = max(FRONT_RADIUS, BACK_RADIUS) * 1.6
     y_min = CENTER[1] - y_extent
     y_max = CENTER[1] + y_extent
@@ -45,7 +49,7 @@ def main():
     pts = np.stack([xx, yy], axis=-1)
 
     mask = in_asymmetric_ellipse(
-        pts, CENTER, HORIZONTAL_RADIUS, FRONT_RADIUS, BACK_RADIUS
+        pts, CENTER, LEFT_RADIUS, RIGHT_RADIUS, FRONT_RADIUS, BACK_RADIUS
     )
 
     plt.figure(figsize=(6, 6))
@@ -61,7 +65,7 @@ def main():
     plt.axhline(CENTER[1], color="gray", linestyle="--", linewidth=0.8)
 
     plt.title(
-        f"Asymmetric ellipse — horiz={HORIZONTAL_RADIUS}, front={FRONT_RADIUS}, back={BACK_RADIUS}"
+        f"Asymmetric ellipse — left={LEFT_RADIUS}, right={RIGHT_RADIUS}, front={FRONT_RADIUS}, back={BACK_RADIUS}"
     )
     plt.xlabel("x")
     plt.ylabel("y")

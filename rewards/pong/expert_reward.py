@@ -1,73 +1,83 @@
-import jax.numpy as jnp
 import jax
-
-SCREEN_WIDTH = 160.0
-SCORE_REWARD = 10.0
-BALL_ON_ENEMY_HALF_REWARD = 0.1
-BALL_ON_PLAYER_HALF_PENALTY = -0.1
-PLAYER_BALL_PROXIMITY_RADIUS = 54.0
-PLAYER_BALL_PROXIMITY_SHARPNESS = 4.0
-PLAYER_BALL_PROXIMITY_MAX_REWARD = 1.0
+import jax.numpy as jnp
 
 
-def _center_x(x, width):
-    return (
-        jnp.asarray(x, dtype=jnp.float32) + jnp.asarray(width, dtype=jnp.float32) * 0.5
-    )
+def _linear_distance(a, b, alpha: float = 0.005) -> jax.Array:
+    distance = jnp.sqrt(jnp.sum((a - b) ** 2))
+    val = jnp.maximum(0.0, 1.0 - alpha * distance)
+
+    return jnp.asarray(val, dtype=jnp.float32)
 
 
-def _center_y(y, height):
-    return (
-        jnp.asarray(y, dtype=jnp.float32) + jnp.asarray(height, dtype=jnp.float32) * 0.5
-    )
+def _exponential_distance(a, b, alpha: float = 0.05) -> jax.Array:
+    distance = jnp.sqrt(jnp.sum((a - b) ** 2))
+    exp_min = jnp.exp(-alpha)
+    val = (jnp.exp(-alpha * distance) - exp_min) / (1.0 - exp_min)
+
+    return jnp.asarray(val, dtype=jnp.float32)
 
 
-def _player_ball_distance(state):
-    player_x = _center_x(140.0, 4.0)
-    player_y = _center_y(state.player_y, 16.0)
-    ball_x = _center_x(state.ball_x, 2.0)
-    ball_y = _center_y(state.ball_y, 4.0)
-    delta_x = ball_x - player_x
-    delta_y = ball_y - player_y
-    return jnp.sqrt(delta_x * delta_x + delta_y * delta_y)
+def _in_ellipse(a, b, horizontal_radius, vertical_radius) -> jax.Array:
+    horizontal_term = (a[0] - b[0]) / horizontal_radius
+    vertical_term = (a[1] - b[1]) / vertical_radius
+    ellipse_distance = horizontal_term * horizontal_term + vertical_term * vertical_term
+
+    return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
 
 
-def _proximity_reward(distance):
-    scaled_distance = jnp.clip(distance / PLAYER_BALL_PROXIMITY_RADIUS, 0.0, 1.0)
-    shaped = (
-        1.0 - jnp.exp(-PLAYER_BALL_PROXIMITY_SHARPNESS * (1.0 - scaled_distance))
-    ) / (1.0 - jnp.exp(-PLAYER_BALL_PROXIMITY_SHARPNESS))
-    return PLAYER_BALL_PROXIMITY_MAX_REWARD * shaped
+def _in_asymmetric_ellipse(
+    a, b, left_radius, right_radius, up_radius, down_radius
+) -> jax.Array:
+    try:
+        horizontal_radius = jnp.where(a[0] < b[0], right_radius, left_radius)
+        horizontal_term = (a[0] - b[0]) / horizontal_radius
+        vertical_radius = jnp.where(a[1] < b[1], down_radius, up_radius)
+        vertical_term = (a[1] - b[1]) / vertical_radius
+        ellipse_distance = (
+            horizontal_term * horizontal_term + vertical_term * vertical_term
+        )
+
+        return jnp.asarray(ellipse_distance < 1.0, dtype=jnp.bool)
+    except (TypeError, IndexError):
+        return jnp.asarray(0.0, dtype=jnp.float32)
+
+
+def _asymmetric_ellipse_linear_distance(
+    a, b, left_radius, right_radius, up_radius, down_radius
+) -> jax.Array:
+    try:
+        horizontal_radius = jnp.where(a[0] < b[0], right_radius, left_radius)
+        horizontal_term = (a[0] - b[0]) / horizontal_radius
+        vertical_radius = jnp.where(a[1] < b[1], down_radius, up_radius)
+        vertical_term = (a[1] - b[1]) / vertical_radius
+        r = jnp.sqrt(horizontal_term * horizontal_term + vertical_term * vertical_term)
+        r = jnp.clip(r, 0.0, 1.0)
+        val = 1.0 - r
+
+        return jnp.asarray(jnp.clip(val, 0.0, 1.0), dtype=jnp.float32)
+    except (TypeError, IndexError):
+        return jnp.asarray(0.0, dtype=jnp.float32)
+
+
+def _asymmetric_ellipse_exponential_distance(
+    a, b, left_radius, right_radius, up_radius, down_radius, alpha: float = 3.0
+) -> jax.Array:
+    try:
+        horizontal_radius = jnp.where(a[0] < b[0], right_radius, left_radius)
+        horizontal_term = (a[0] - b[0]) / horizontal_radius
+        vertical_radius = jnp.where(a[1] < b[1], down_radius, up_radius)
+        vertical_term = (a[1] - b[1]) / vertical_radius
+        r = jnp.sqrt(horizontal_term * horizontal_term + vertical_term * vertical_term)
+        r = jnp.clip(r, 0.0, 1.0)
+        exp_min = jnp.exp(-alpha)
+        val = (jnp.exp(-alpha * r) - exp_min) / (1.0 - exp_min)
+
+        return jnp.asarray(jnp.clip(val, 0.0, 1.0), dtype=jnp.float32)
+    except (TypeError, IndexError):
+        return jnp.asarray(0.0, dtype=jnp.float32)
 
 
 def reward_function(previous_state, state) -> jax.Array:
-    reward = 0.0
-
-    player_score_delta = jnp.asarray(
-        state.player_score - previous_state.player_score, dtype=jnp.float32
-    )
-    enemy_score_delta = jnp.asarray(
-        state.enemy_score - previous_state.enemy_score, dtype=jnp.float32
-    )
-    reward += SCORE_REWARD * player_score_delta
-    reward -= SCORE_REWARD * enemy_score_delta
-
-    ball_on_enemy_half = (
-        jnp.asarray(state.ball_x, dtype=jnp.float32) < SCREEN_WIDTH * 0.5
-    )
-    reward += jnp.where(ball_on_enemy_half, BALL_ON_ENEMY_HALF_REWARD, 0.0)
-
-    ball_on_player_half = jnp.logical_not(ball_on_enemy_half)
-    player_ball_distance = _player_ball_distance(state)
-    close_to_ball = player_ball_distance <= PLAYER_BALL_PROXIMITY_RADIUS
-    reward += jnp.where(
-        ball_on_player_half,
-        jnp.where(
-            close_to_ball,
-            _proximity_reward(player_ball_distance),
-            BALL_ON_PLAYER_HALF_PENALTY,
-        ),
-        0.0,
-    )
+    reward = jnp.asarray(0.0, dtype=jnp.float32)
 
     return jnp.asarray(reward, dtype=jnp.float32)

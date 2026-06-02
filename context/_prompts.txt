@@ -126,11 +126,11 @@ scaled penalty of 0 to -1 for player being close to a coconout. the closer the p
 +5 for collecting fruit
 +10 for collecting last fruit
 +7 for collecting bell
-scaled reward of 0 to 0.5 for moving towards child vertically (only check y unless both player and child are at a similar y distance, then check/reward x as well)
-scaled reward of 0 to 0.2 for moving towards the ladder that is on the most similar y level as the player but not below the player (as to not keep the player at the ladder they just climbed up)
+scaled reward of 0 to 0.5 for moving towards child vertically (only check y unless both player and child are at a similar y level, then check/reward x as well)
+scaled reward of 0 to 0.2 for moving towards the ladder either on the same level or the next higher level fro  the player (specifically not the ladder the player just came up)
 +0.1 for moving up while on ladder
 +0.1 for moving up (y pos)
--0.1 for moving down (y pos)
+-0.2 for moving down (y pos)
 
 Generate the function as expert_reward.py in rewards/{game}.
 
@@ -211,3 +211,10 @@ scaled penalty of 0 to -1 for approaching trees and moguls in a forward-facing s
 scaled reward of 0 to 0.5 for jumping over nearby moguls without collision
 
 Generate the function as expert_reward.py in rewards/{game}.
+
+
+
+
+
+
+I want you to create the reward function for Knagaroo. Follow the coding style from the freeway/expert/reward.py. Do not add any other helper functions. Do not modify helper functions. Use the accessible variables in kanagroo.py as reference. Keep the code as simple as possible, with a separate part in reward function for each feature (as in the freeway example).
