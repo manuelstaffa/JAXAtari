@@ -10,10 +10,13 @@ import os
 # Fix CUDNN non-determinisim; https://github.com/google/jax/issues/4823#issuecomment-952835771
 # os.environ["XLA_FLAGS"] = "--xla_gpu_enable_command_buffers="
 # os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
+import functools
+import importlib.util
 import random
 import time
 from functools import partial
-from typing import Sequence, NamedTuple
+from dataclasses import is_dataclass, asdict as dataclass_asdict
+from typing import Any, Callable, Sequence, NamedTuple
 
 import flax
 import flax.linen as nn
@@ -27,15 +30,82 @@ from flax.training.train_state import TrainState
 import jaxatari
 import hydra
 from omegaconf import OmegaConf
-from jaxatari.wrappers import NormalizeObservationWrapper, ObjectCentricWrapper, PixelObsWrapper, AtariWrapper, LogWrapper, FlattenObservationWrapper
+from jaxatari.wrappers import JaxatariWrapper, NormalizeObservationWrapper, ObjectCentricWrapper, PixelObsWrapper, AtariWrapper, LogWrapper, FlattenObservationWrapper
 from jaxatari import spaces
 from ppo_jaxatari_vmap_eval import evaluate
 
 from rtpt import RTPT
 
 
+def _load_reward_function(path: str | None) -> Callable | None:
+    if not path:
+        return None
+    spec = importlib.util.spec_from_file_location("_reward_mod", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for name in ("reward_function", "reward", "compute_reward", "get_reward"):
+        fn = getattr(mod, name, None)
+        if callable(fn):
+            return fn
+    raise ValueError(f"No callable reward function found in {path}")
 
-def make_env(env_id, seed, num_envs, mods=[], pixel_based=True, native_downscaling=True, smooth_image=True, eval=False):
+
+class _RewardOverrideWrapper(JaxatariWrapper):
+    """Replace the base env reward with a custom fn; preserve original as info['base_reward']."""
+
+    def __init__(self, env, fn: Callable):
+        super().__init__(env)
+        self._fn = fn
+
+    @functools.partial(jax.jit, static_argnums=(0,))
+    def step(self, state, action):
+        obs, new_state, base_reward, done, info = self._env.step(state, action)
+        custom_reward = self._fn(state, new_state)
+        if hasattr(info, "_asdict"):
+            info = info._asdict()
+        elif is_dataclass(info):
+            info = dataclass_asdict(info)
+        elif not isinstance(info, dict):
+            info = dict(info)
+        info["base_reward"] = base_reward
+        return obs, new_state, custom_reward, done, info
+
+
+@flax.struct.dataclass
+class _BaseRewardLogState:
+    inner_state: Any
+    base_episode_returns: float
+    returned_base_episode_returns: float
+
+
+class _BaseRewardLogWrapper(JaxatariWrapper):
+    """Episode-accumulates info['base_reward'] → info['returned_base_episode_returns']."""
+
+    @functools.partial(jax.jit, static_argnums=(0,))
+    def reset(self, key):
+        obs, inner_state = self._env.reset(key)
+        state = _BaseRewardLogState(inner_state, jnp.float32(0), jnp.float32(0))
+        return obs, state
+
+    @functools.partial(jax.jit, static_argnums=(0,))
+    def step(self, state, action):
+        obs, inner_state, reward, terminated, truncated, info = self._env.step(state.inner_state, action)
+        base_reward = info.get("base_reward", jnp.float32(0))
+        done = info.get("env_done", jnp.bool_(terminated))
+        done = jnp.logical_or(done, truncated)
+        new_base_return = state.base_episode_returns + base_reward
+        new_state = _BaseRewardLogState(
+            inner_state=inner_state,
+            base_episode_returns=jnp.where(done, jnp.float32(0), new_base_return),
+            returned_base_episode_returns=jnp.where(
+                done, new_base_return, state.returned_base_episode_returns
+            ),
+        )
+        info["returned_base_episode_returns"] = new_state.returned_base_episode_returns
+        return obs, new_state, reward, terminated, truncated, info
+
+
+def make_env(env_id, seed, num_envs, mods=[], pixel_based=True, native_downscaling=True, smooth_image=True, eval=False, reward_function=None, clip_reward=True):
     def thunk():
         # For training (eval=False), avoid applying multiple potentially conflicting
         # mods at once. In that case, fall back to the base environment.
@@ -52,10 +122,12 @@ def make_env(env_id, seed, num_envs, mods=[], pixel_based=True, native_downscali
             mods_arg = active_mods
 
         env = jaxatari.make(env_id, mods=mods_arg)
+        if reward_function is not None:
+            env = _RewardOverrideWrapper(env, reward_function)
         env = AtariWrapper(
                 env,
                 sticky_actions=0.0,
-                episodic_life=not eval, # only active during training 
+                episodic_life=not eval, # only active during training
                 first_fire=True,
                 noop_max=30,
                 full_action_space=False,
@@ -71,7 +143,7 @@ def make_env(env_id, seed, num_envs, mods=[], pixel_based=True, native_downscali
                 frame_stack_size=4,
                 frame_skip=4,
                 max_pooling=True,
-                clip_reward=True, # only active during training
+                clip_reward=clip_reward and not eval,
             )
         else:
             env = FlattenObservationWrapper(
@@ -80,11 +152,13 @@ def make_env(env_id, seed, num_envs, mods=[], pixel_based=True, native_downscali
                         env,
                         frame_stack_size=4,
                         frame_skip=4,
-                        clip_reward=True,
+                        clip_reward=clip_reward and not eval,
                     )
                 )
             )
         env = LogWrapper(env)
+        if reward_function is not None:
+            env = _BaseRewardLogWrapper(env)
         env.num_envs = num_envs
         env.single_action_space = env.action_space
         env.single_observation_space = env.observation_space
@@ -220,7 +294,9 @@ def single_run(config: dict):
     key, obs_sample_key1, obs_sample_key2, obs_sample_key3 = jax.random.split(key, 4)
 
     # env setup
-    env = make_env(config["ENV_ID"], config["SEED"], config["NUM_ENVS"], list(config["TRAIN_MODS"]), config["PIXEL_BASED"], config["NATIVE_DOWNSCALING"], config["SMOOTH_IMAGE"])()
+    reward_fn = _load_reward_function(config.get("REWARD_FUNCTION"))
+    clip_reward = config.get("CLIP_REWARD", True)
+    env = make_env(config["ENV_ID"], config["SEED"], config["NUM_ENVS"], list(config["TRAIN_MODS"]), config["PIXEL_BASED"], config["NATIVE_DOWNSCALING"], config["SMOOTH_IMAGE"], reward_function=reward_fn, clip_reward=clip_reward)()
    
     # vmap and squeeze observations in order to get (B, F, H, W, 1) -> (B, F, H, W),
     # where F is the frame stack which becomes the channel for the convolutions
@@ -614,7 +690,7 @@ def single_run(config: dict):
 
         # TRY NOT TO MODIFY: record rewards for plotting purposes
         metrics = {
-            "charts/avg_episodic_return": info["returned_episode_returns"].mean(), 
+            "charts/avg_episodic_return": info["returned_episode_returns"].mean(),
             "charts/avg_episodic_length": info["returned_episode_lengths"].mean(),
             "charts/learning_rate": agent_state.opt_state[1].hyperparams["learning_rate"].item(),
             "losses/value_loss": v_loss[-1, -1].item(),
@@ -627,7 +703,8 @@ def single_run(config: dict):
             "charts/time": time.time() - start_time,
             "charts/global_step": global_step,
         }
-        # merge metrics and info (under charts/)
+        if "returned_base_episode_returns" in info:
+            metrics["charts/avg_base_episodic_return"] = info["returned_base_episode_returns"].mean()
         wandb.log(metrics, step=iteration)
     end_time = time.time()
     print("Training done.")
