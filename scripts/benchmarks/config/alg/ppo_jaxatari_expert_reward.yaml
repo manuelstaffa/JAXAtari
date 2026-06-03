@@ -1,0 +1,40 @@
+EXP_NAME: ppo_expert_reward
+TRACK: True
+CAPTURE_VIDEO: True
+
+EVAL_DURING_TRAIN: False
+EVAL_EVERY: 1000
+
+PIXEL_BASED: False          # Expert rewards read game state (positions, velocities), not pixels
+NATIVE_DOWNSCALING: True
+SMOOTH_IMAGE: False
+
+SAVE_MODEL: True
+UPLOAD_MODEL: False
+HF_ENTITY: ""
+
+ENV_ID: pong
+TRAIN_MODS: []
+EVAL_MODS: []
+
+# Path to reward function file (relative to working directory when running, i.e. ManuelJAX/).
+# Override per-game: alg.REWARD_FUNCTION=rewards/kangaroo/expert_reward.py
+REWARD_FUNCTION: "rewards/pong/expert_reward2.py"
+CLIP_REWARD: False          # Expert reward magnitudes must not be clipped
+
+TOTAL_TIMESTEPS: 10000000
+LEARNING_RATE: 0.00025
+NUM_ENVS: 64
+NUM_STEPS: 128
+ANNEAL_LR: True
+GAMMA: 0.99
+GAE_LAMBDA: 0.95
+NUM_MINIBATCHES: 4
+UPDATE_EPOCHS: 4
+NORM_ADV: True
+CLIP_COEF: 0.1
+CLIP_VLOSS: False
+ENT_COEF: 0.005             # Dense shaped rewards reduce need for entropy-driven exploration
+VF_COEF: 0.5
+MAX_GRAD_NORM: 0.5
+TARGET_KL: null
